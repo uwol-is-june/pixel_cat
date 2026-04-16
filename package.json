@@ -2,11 +2,17 @@
   "name": "pixel-cat",
   "displayName": "🐱 Pixel Cat",
   "description": "A tiny pixel cat lives in your editor",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "publisher": "uwol-is-june",
-  "engines": { "vscode": "^1.80.0" },
-  "categories": ["Other"],
-  "activationEvents": ["onStartupFinished"],
+  "engines": {
+    "vscode": "^1.80.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
   "main": "./extension.js",
   "contributes": {
     "views": {
@@ -19,10 +25,22 @@
       ]
     },
     "commands": [
-      { "command": "pixelCat.show",  "title": "🐱 Pixel Cat: Show" },
-      { "command": "pixelCat.food",  "title": "🐟 Pixel Cat: /food" },
-      { "command": "pixelCat.pet",   "title": "🤚 Pixel Cat: /pet"  },
-      { "command": "pixelCat.sleep", "title": "💤 Pixel Cat: /sleep" }
+      {
+        "command": "pixelCat.show",
+        "title": "🐱 Pixel Cat: Show"
+      },
+      {
+        "command": "pixelCat.food",
+        "title": "🐟 Pixel Cat: /food"
+      },
+      {
+        "command": "pixelCat.pet",
+        "title": "🤚 Pixel Cat: /pet"
+      },
+      {
+        "command": "pixelCat.sleep",
+        "title": "💤 Pixel Cat: /sleep"
+      }
     ]
   },
   "scripts": {
