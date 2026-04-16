@@ -3,7 +3,7 @@
 ## 프로젝트 개요
 
 VSCode 안에서 픽셀 고양이를 키우는 익스텐션.
-고양이는 에디터 하단 상태바에 항상 표시되며, 별도 WebviewPanel(캔버스)에서 더 크게 볼 수 있다.
+고양이는 에디터 하단 상태바에 항상 표시되며, Explorer 사이드바 패널(캔버스)에서 볼 수 있다.
 `/food`, `/pet`, `/sleep` 같은 커맨드로 고양이와 상호작용한다.
 
 **목표**: 코딩할 때 옆에 있어주는 작은 동반자. 귀엽고, 가볍고, 방해되지 않아야 한다.
@@ -24,13 +24,14 @@ VSCode 안에서 픽셀 고양이를 키우는 익스텐션.
 
 ```
 extension.js (activate)
-  ├── StatusBarItem (Left)  → =^･ω･^= 애니메이션 텍스트, 클릭 시 패널 열기
-  ├── WebviewPanel          → Canvas 렌더링 + 자율 행동 상태 머신
-  │     ├── drawBG()        → 별/바닥 배경
-  │     ├── drawCat()       → 상태별 스프라이트 (walk/sit/groom/sleep/eat/happy)
-  │     ├── tickState()     → 고양이 자율 이동 + 상태 전환 타이머
-  │     └── tickParticles() → 하트/Zzz/반짝 파티클
-  └── Commands              → extension→webview postMessage로 상태 전환
+  ├── StatusBarItem (Left)     → =^･ω･^= 애니메이션 텍스트, 클릭 시 사이드바 포커스
+  ├── CatViewProvider          → WebviewViewProvider (Explorer 사이드바 패널)
+  │     ├── resolveWebviewView() → webview 초기화, HTML 주입
+  │     ├── drawBG()           → 별/바닥 배경
+  │     ├── drawCat()          → 상태별 스프라이트 (walk/sit/groom/sleep/eat/happy)
+  │     ├── tickState()        → 고양이 자율 이동 + 상태 전환 타이머
+  │     └── tickParticles()    → 하트/Zzz/반짝 파티클
+  └── Commands                 → extension→webview postMessage로 상태 전환
 ```
 
 ---
@@ -38,7 +39,7 @@ extension.js (activate)
 ## 현재 구현된 기능 체크리스트
 
 - [x] 상태바에 고양이 표시
-- [x] Webview 패널 열기
+- [x] Explorer 사이드바 WebviewView 패널
 - [x] Canvas 기반 고양이 렌더링
 - [x] 걷기(walk) 애니메이션
 - [x] 앉기(sit) 애니메이션

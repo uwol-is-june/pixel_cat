@@ -2,7 +2,7 @@
 
 VSCode 안에서 픽셀 고양이를 키우는 익스텐션.
 
-고양이 **Nabi**는 에디터 옆 패널에서 스스로 걷고, 앉고, 그루밍하며 생활한다.
+고양이 **Nabi**는 Explorer 사이드바 패널에서 스스로 걷고, 앉고, 그루밍하며 생활한다.
 커맨드로 밥을 주거나 쓰다듬거나 재울 수 있다.
 
 ---
@@ -62,6 +62,18 @@ npm run package
 ---
 
 ## 버전 히스토리
+
+### v0.1.2 — 2026-04-16 · Sidebar Migration
+
+**WebviewPanel(에디터 탭) → Explorer 사이드바 WebviewView로 전환.**
+
+- `WebviewPanel` 제거, `CatViewProvider` (`WebviewViewProvider`) 도입
+- Explorer 사이드바에 "🐱 Nabi" 패널 상시 표시
+- `package.json`에 `views.explorer` 등록
+- 상태바 클릭 시 사이드바 패널 포커스 (`pixelCat.focus`)
+- 나머지 동작(커맨드·애니메이션·파티클)은 그대로 유지
+
+---
 
 ### v0.1.1 — 2026-04-16 · Prototype Integration
 

@@ -1,10 +1,37 @@
 'use strict';
 const vscode = require('vscode');
 
-let panel = null;
+class CatViewProvider {
+  constructor(context) {
+    this._context = context;
+    this._view = null;
+  }
+
+  resolveWebviewView(webviewView) {
+    this._view = webviewView;
+    webviewView.webview.options = { enableScripts: true };
+    webviewView.webview.html = getHTML();
+    webviewView.webview.onDidReceiveMessage(msg => {
+      if (msg.type === 'meow') vscode.window.showInformationMessage('🐱 Nyaa~!');
+    });
+    webviewView.onDidDispose(() => { this._view = null; });
+  }
+
+  send(type) {
+    this._view?.webview.postMessage({ type });
+    this._context.globalState.update('catState', type);
+  }
+}
 
 /** @param {vscode.ExtensionContext} context */
 function activate(context) {
+  const provider = new CatViewProvider(context);
+  context.subscriptions.push(
+    vscode.window.registerWebviewViewProvider('pixelCat', provider, {
+      webviewOptions: { retainContextWhenHidden: true }
+    })
+  );
+
   // ── 상태바 (왼쪽, 애니메이션) ──────────────────────────────────────
   const sb = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, -999);
   sb.command = 'pixelCat.show';
@@ -21,37 +48,19 @@ function activate(context) {
   context.subscriptions.push({ dispose: () => clearInterval(sbTimer) });
 
   // ── 커맨드 ────────────────────────────────────────────────────────
-  const open = () => openPanel(context);
+  // pixelCat.focus는 VSCode가 WebviewView id로 자동 생성하는 내장 커맨드
+  const show = () => vscode.commands.executeCommand('pixelCat.focus');
   const send = (type) => {
-    open();
-    setTimeout(() => panel?.webview.postMessage({ type }), 150);
-    // globalState에 상태 저장
-    context.globalState.update('catState', type);
+    show();
+    setTimeout(() => provider.send(type), 150);
   };
 
   context.subscriptions.push(
-    vscode.commands.registerCommand('pixelCat.show',  open),
+    vscode.commands.registerCommand('pixelCat.show',  show),
     vscode.commands.registerCommand('pixelCat.food',  () => send('food')),
     vscode.commands.registerCommand('pixelCat.pet',   () => send('pet')),
     vscode.commands.registerCommand('pixelCat.sleep', () => send('sleep')),
   );
-}
-
-/** @param {vscode.ExtensionContext} context */
-function openPanel(context) {
-  if (panel) { panel.reveal(); return; }
-
-  panel = vscode.window.createWebviewPanel(
-    'pixelCat', '🐱 Nabi',
-    { viewColumn: vscode.ViewColumn.Beside, preserveFocus: true },
-    { enableScripts: true, retainContextWhenHidden: true }
-  );
-
-  panel.webview.html = getHTML();
-  panel.onDidDispose(() => { panel = null; }, null, context.subscriptions);
-  panel.webview.onDidReceiveMessage(msg => {
-    if (msg.type === 'meow') vscode.window.showInformationMessage('🐱 Nyaa~!');
-  }, null, context.subscriptions);
 }
 
 // ─────────────────────────────────────────────────────────────────
