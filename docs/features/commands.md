@@ -2,11 +2,12 @@
 
 ## 현재 상태
 
-- [x] `pixel-cat.open` — 패널 열기 (구현됨)
-- [x] `pixel-cat.food` — 먹이 주기 (stub 구현)
-- [x] `pixel-cat.pet` — 쓰다듬기 (stub 구현)
-- [x] `pixel-cat.sleep` — 재우기 (stub 구현)
-- [ ] 커맨드 실행 후 실제 애니메이션 연동
+- [x] `pixel-cat.open` — 패널 열기
+- [x] `pixel-cat.food` — 먹이 주기 (eating 애니메이션 + 4초 후 idle 복귀)
+- [x] `pixel-cat.pet` — 쓰다듬기 (grooming 애니메이션 + 4초 후 sitting 복귀)
+- [x] `pixel-cat.sleep` — 재우기 (sleeping 애니메이션, 재실행 시 깨움)
+- [x] 커맨드 실행 중 중복 방지 (eating/grooming 중 재실행 무시)
+- [x] 잠자는 중 sleep 커맨드로 깨우기
 
 ---
 

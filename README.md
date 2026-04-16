@@ -59,6 +59,21 @@ npm run package
 
 ## 버전 히스토리
 
+### v0.1.0 — 2026-04-16 · MVP
+
+**모든 기본 기능 구현 완료.**
+
+- 16×16 픽셀아트 고양이 스프라이트 (팔레트 7색)
+- 6종 애니메이션: idle(눈 깜빡임) / walking(발 교차) / sitting / grooming(발로 얼굴 닦기) / sleeping(Zzz) / eating(혀 내밀기)
+- `/food` — 먹이 주기: eating 4초 → idle 복귀
+- `/pet` — 쓰다듬기: grooming 4초 → sitting 복귀
+- `/sleep` — 재우기: sleeping 상태 (재실행 시 깨움)
+- 커맨드 중복 실행 방지
+- 상태 영속성: `ExtensionContext.globalState`로 재시작 후에도 상태 유지
+- 상태 변경 시 상태바 이모지 자동 업데이트
+
+---
+
 ### v0.0.1 — 2026-04-16 · Project Scaffolding
 
 **초기 프로젝트 세팅.** 코드는 없고 뼈대만 있는 상태.

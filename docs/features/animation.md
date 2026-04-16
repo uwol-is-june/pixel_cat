@@ -2,10 +2,10 @@
 
 ## 현재 상태
 
-- [x] Canvas 렌더링 루프 기본 뼈대 (setInterval 기반)
-- [x] Placeholder 고양이 도형 (임시)
-- [ ] 실제 픽셀아트 스프라이트
-- [ ] 상태별 애니메이션 분기
+- [x] Canvas 렌더링 루프 (`requestAnimationFrame` 기반)
+- [x] 실제 픽셀아트 스프라이트 (16×16, 팔레트 7색)
+- [x] 상태별 애니메이션 분기
+- [x] idle / walking / sitting / grooming / sleeping / eating 전 상태 구현
 
 ---
 
