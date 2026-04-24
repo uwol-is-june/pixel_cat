@@ -2,7 +2,7 @@
   "name": "pixel-cat",
   "displayName": "🐱 Pixel Cat",
   "description": "A tiny pixel cat lives in your editor",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "publisher": "uwol-is-june",
   "repository": {
     "type": "git",
