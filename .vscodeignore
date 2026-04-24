@@ -4,3 +4,4 @@ docs/**
 .gitignore
 CLAUDE.md
 *.vsix
+generate-icon.js

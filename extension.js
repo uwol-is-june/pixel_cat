@@ -60,6 +60,7 @@ function activate(context) {
     vscode.commands.registerCommand('pixelCat.food',  () => send('food')),
     vscode.commands.registerCommand('pixelCat.pet',   () => send('pet')),
     vscode.commands.registerCommand('pixelCat.sleep', () => send('sleep')),
+    vscode.commands.registerCommand('pixelCat.code',  () => send('code')),
   );
 }
 
@@ -113,28 +114,34 @@ canvas {
 }
 
 #btnbar {
-  padding: 10px 14px;
+  padding: 8px 10px;
   display: flex;
-  gap: 8px;
+  flex-wrap: wrap;
+  gap: 6px;
   border-top: 1px solid #1e2530;
   background: #0d1117;
   flex-shrink: 0;
 }
 button {
+  flex: 1 1 0;
+  min-width: 0;
   background: #161b22;
   color: #8b949e;
   border: 1px solid #2a3040;
-  padding: 5px 14px;
+  padding: 5px 4px;
   cursor: pointer;
   border-radius: 5px;
   font-family: 'Courier New', monospace;
-  font-size: 12px;
+  font-size: 11px;
   transition: all 0.15s;
-  letter-spacing: 0.5px;
+  letter-spacing: 0.3px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 button:hover { background:#21262d; color:#e8942a; border-color:#e8942a; }
 button:active { transform: scale(0.95); }
-#hint { color:#333; font-size:10px; margin-left:auto; align-self:center; }
+#hint { color:#333; font-size:10px; width:100%; text-align:center; margin-top:2px; }
 </style>
 </head>
 <body>
@@ -150,8 +157,8 @@ button:active { transform: scale(0.95); }
 
 <div id="btnbar">
   <button onclick="feed()">🐟 /food</button>
-  <button onclick="pet()">🤚 /pet</button>
   <button onclick="goSleep()">💤 /sleep</button>
+  <button onclick="startCode()">💻 /code</button>
   <span id="hint">or use Cmd+Shift+P → Pixel Cat</span>
 </div>
 
@@ -191,7 +198,7 @@ function rect(c1, r1, c2, r2, color) {
 const OG = '#e8942a'; // 주황 몸통
 const LT = '#f7c97a'; // 밝은 얼굴
 const PK = '#ffaaaa'; // 분홍 (귀 안, 코)
-const GR = '#5cb870'; // 초록 눈동자
+const GR = '#d4a030'; // 호박 눈동자 (주황 태비 자연색)
 const DK = '#0d1117'; // 짙은 윤곽선
 const WH = '#f0e8d0'; // 크림 배
 const ST = '#b06820'; // 짙은 줄무늬
@@ -203,138 +210,173 @@ const HT = '#ff6a88'; // 하트 색
 function drawBody() {
   rect(2, 8, 11, 13, DK);
   rect(3, 9, 10, 12, OG);
-  rect(4, 9,  9, 11, WH); // 배
-  px(3, 10, ST); px(3, 11, ST);
-  px(10, 10, ST); px(10, 11, ST);
-  px(4, 9, ST);  px(9, 9, ST);
+  rect(4, 9, 9, 12, WH);
+  px(3, 9, ST); px(3, 10, ST); px(3, 11, ST);
+  px(10, 9, ST); px(10, 10, ST); px(10, 11, ST);
+  px(4, 9, ST); px(8, 9, ST);
 }
 
 // ── 기본 머리 ────────────────────────────────────────────────────
 // eyeType: 'open' | 'closed' | 'happy' | 'wide'
 function drawHead(eyeType = 'open') {
-  // 귀
-  px(4, 1, DK); px(5, 1, DK);
-  px(8, 1, DK); px(9, 1, DK);
-  px(4, 2, OG); px(5, 2, PK); px(6, 2, DK);
-  px(7, 2, DK); px(8, 2, PK); px(9, 2, OG);
+  // 귀 (뾰족한 삼각형)
+  px(3, 0, DK); px(4, 0, DK);
+  px(9, 0, DK); px(10, 0, DK);
+  px(2, 1, DK); px(3, 1, OG); px(4, 1, PK); px(5, 1, DK);
+  px(8, 1, DK); px(9, 1, PK); px(10, 1, OG); px(11, 1, DK);
 
-  // 머리 윤곽 + 얼굴
-  rect(3, 3, 10, 7, DK);
-  rect(4, 4,  9, 6, LT);
-  row(3, 4, 9, OG);  // 머리 위 = 주황
-  row(7, 4, 9, WH);  // 턱 = 크림
+  // 머리 윤곽 + 전체 채움 (주황)
+  px(2, 2, DK); row(2, 3, 10, OG); px(11, 2, DK);
+  for (let r = 3; r <= 7; r++) { px(2, r, DK); row(r, 3, 10, OG); px(11, r, DK); }
+  row(8, 2, 11, DK);
 
-  // 눈
-  if (eyeType === 'open') {
-    px(5, 4, GR); px(6, 4, GR);
-    px(8, 4, GR); px(9, 4, GR);
-    px(5, 5, DK); px(6, 5, DK);
-    px(8, 5, DK); px(9, 5, DK);
-  } else if (eyeType === 'closed') {
-    row(5, 5, 6, DK);
-    row(5, 8, 9, DK);
-  } else if (eyeType === 'happy') {
-    px(5, 4, DK); px(6, 5, DK);
-    px(8, 4, DK); px(9, 5, DK);
-  } else if (eyeType === 'wide') {
-    px(5, 4, GR); px(6, 4, GR);
-    px(8, 4, GR); px(9, 4, GR);
-    px(5, 5, GR); px(6, 5, DK);
-    px(8, 5, GR); px(9, 5, DK);
+  // 얼굴 밝은 영역
+  rect(4, 5, 9, 7, LT);
+  px(3, 5, OG); px(3, 6, OG); // 왼쪽 볼
+  px(10, 5, OG); px(10, 6, OG); // 오른쪽 볼
+  // 행복할 때 볼 홍조
+  if (eyeType === 'happy') {
+    px(3, 5, PK); px(3, 6, PK);
+    px(10, 5, PK); px(10, 6, PK);
   }
 
-  // 코 + 수염
-  px(7, 6, PK);
-  ctx.fillStyle = '#333';
-  ctx.fillRect(3 * PX, 6 * PX + 1, 2 * PX, 1);
-  ctx.fillRect(11 * PX, 6 * PX + 1, 2 * PX, 1);
+  // 눈 (2×2 홍채 + 동공)
+  if (eyeType === 'open') {
+    px(4, 3, GR); px(5, 3, GR); px(4, 4, GR); px(5, 4, DK);
+    px(8, 3, GR); px(9, 3, GR); px(8, 4, GR); px(9, 4, DK);
+  } else if (eyeType === 'closed') {
+    row(4, 4, 5, DK);
+    row(4, 8, 9, DK);
+  } else if (eyeType === 'happy') {
+    px(4, 3, DK); px(5, 4, DK);
+    px(9, 3, DK); px(8, 4, DK);
+  } else if (eyeType === 'wide') {
+    px(4, 3, GR); px(5, 3, GR); px(4, 4, GR); px(5, 4, GR);
+    px(8, 3, GR); px(9, 3, GR); px(8, 4, GR); px(9, 4, GR);
+  }
+
+  // 코 (분홍 2픽셀)
+  px(6, 6, PK); px(7, 6, PK);
+
+  // 수염 (반투명 얇은 선 — facingLeft 뒤집기에서도 자동 대칭)
+  ctx.fillStyle = '#cccccc44';
+  ctx.fillRect(0,        5 * PX + 2, 2 * PX, 1);
+  ctx.fillRect(0,        6 * PX + 2, 2 * PX, 1);
+  ctx.fillRect(12 * PX,  5 * PX + 2, 3 * PX, 1);
+  ctx.fillRect(12 * PX,  6 * PX + 2, 3 * PX, 1);
 }
 
 // ── 다리 ─────────────────────────────────────────────────────────
 // legPhase: 0=중립, 1=걷기A, 2=걷기B
 function drawLegs(legPhase = 0) {
   if (legPhase === 0) {
-    px(3, 13, DK); px(4, 13, OG); px(4, 14, DK); px(3, 14, DK);
-    px(9, 13, DK); px(10, 13, OG); px(10, 14, DK); px(9, 14, DK);
+    px(3, 13, OG); px(4, 13, OG);
+    px(3, 14, DK); px(4, 14, DK); px(5, 14, DK);
+    px(8, 13, OG); px(9, 13, OG);
+    px(8, 14, DK); px(9, 14, DK); px(10, 14, DK);
   } else if (legPhase === 1) {
-    px(3, 13, OG); px(3, 14, DK); px(2, 14, DK);
-    px(9, 13, OG); px(10, 13, OG); px(11, 13, DK);
-    px(10, 14, OG); px(11, 14, DK);
+    px(2, 13, OG); px(3, 13, OG); px(2, 14, DK); px(3, 14, DK);
+    px(9, 13, OG); px(10, 13, OG); px(10, 14, OG); px(11, 14, DK);
   } else {
     px(3, 13, OG); px(4, 13, OG); px(4, 14, OG); px(5, 14, DK);
-    px(9, 13, OG); px(9, 14, DK); px(8, 14, DK);
+    px(8, 13, OG); px(7, 14, DK); px(8, 14, DK);
   }
 }
 
 // ── 꼬리 ─────────────────────────────────────────────────────────
-// swing: 0=오른쪽, 1=위, -1=왼쪽
+// swing: 0=자연, 1=위, -1=아래
 function drawTail(swing = 0) {
   if (swing === 0) {
-    px(11, 10, OG); px(11, 11, OG);
-    px(12, 12, OG); px(12, 13, DK);
+    px(11, 9, OG); px(12, 9, OG);
+    px(12, 10, OG); px(12, 11, OG);
+    px(11, 12, OG); px(12, 12, DK);
   } else if (swing === 1) {
-    px(11, 9, OG); px(12, 8, OG);
-    px(12, 9, OG); px(13, 8, DK);
+    px(11, 7, OG); px(12, 7, OG);
+    px(12, 8, OG); px(13, 8, OG);
+    px(12, 6, DK); px(13, 9, DK);
   } else {
-    px(11, 11, OG); px(10, 12, OG);
-    px(10, 13, DK);
+    px(11, 10, OG); px(11, 11, OG);
+    px(10, 11, OG); px(10, 12, OG);
+    px(9, 12, DK);
   }
 }
 
 // ── 상태별 드로잉 ────────────────────────────────────────────────
 function drawWalk(frame) {
-  const phase    = frame % 4;
-  const legPhase = phase < 2 ? 1 : 2;
-  const tailSwing = frame % 6 < 3 ? 0 : 1;
-  const bob = phase < 2 ? 0 : 1;
+  const cycle    = frame % 8;
+  const legPhase = cycle < 4 ? 1 : 2;
+  // 발이 바닥을 박차는 순간 몸이 살짝 위로 솟는 아치 (sin 곡선)
+  const bob      = -Math.abs(Math.sin(cycle / 8 * Math.PI * 2)) * PX * 0.7;
+  // 꼬리는 몸보다 반박자 늦게 반응 (follow-through)
+  const tailSin  = Math.sin((frame + 4) / 8 * Math.PI * 2);
+  const tailSwing = tailSin > 0.4 ? 1 : tailSin < -0.4 ? -1 : 0;
 
   ctx.save();
-  ctx.translate(0, bob * PX);
+  ctx.translate(0, bob);
   drawBody();
   drawLegs(legPhase);
   drawTail(tailSwing);
+  drawHead('open'); // 머리도 함께 — 분리 없이 자연스럽게
   ctx.restore();
-  drawHead('open');
 }
 
 function drawSit(frame) {
   const blink    = frame % 90 > 85;
-  const tailSwing = Math.floor(frame / 20) % 3 - 1;
+  // 느리고 자연스러운 호흡 (가슴이 살짝 오르내림)
+  const breathe  = Math.sin(frame / 30) * PX * 0.4;
+  // 꼬리: sin 곡선으로 부드럽게 좌우 흔들기
+  const tailSin  = Math.sin(frame / 22);
+  const tailSwing = tailSin > 0.55 ? 1 : tailSin < -0.55 ? -1 : 0;
+
+  ctx.save();
+  ctx.translate(0, breathe);
   drawBody();
   drawLegs(0);
   drawTail(tailSwing);
+  ctx.restore();
   drawHead(blink ? 'closed' : 'open');
 }
 
 function drawGroom(frame) {
-  const lick = frame % 8;
+  const lick = frame % 12; // 8→12프레임: 좀 더 여유있는 그루밍 리듬
   drawBody();
   drawLegs(0);
   drawTail(0);
-  // 발 올리기
-  if (lick < 4) {
-    px(10, 5, OG); px(11, 4, OG); px(11, 5, DK);
+  if (lick < 6) {
+    px(11, 4, OG); px(12, 4, OG); px(12, 3, DK);
   } else {
-    px(10, 4, OG); px(11, 3, OG); px(11, 4, DK);
+    px(11, 2, OG); px(12, 2, OG); px(12, 1, DK);
   }
-  drawHead(lick < 4 ? 'closed' : 'open');
+  drawHead(lick < 6 ? 'closed' : 'open');
 }
 
 function drawSleeping(frame) {
-  const breathe = frame % 40 < 20 ? 0 : 1;
+  // 잠든 고양이의 느리고 고른 호흡 (sin 곡선)
+  const breathe = Math.sin(frame / 15) * 0.5 + 0.5;
 
   ctx.save();
   ctx.translate(0, breathe * PX);
+
+  // 누운 몸통
   rect(2, 10, 12, 14, DK);
   rect(3, 11, 11, 13, OG);
-  rect(4, 11,  9, 12, WH);
-  px(3, 11, ST); px(10, 11, ST);
+  rect(4, 11, 9, 12, WH);
+  px(3, 11, ST); px(3, 12, ST); px(10, 11, ST); px(10, 12, ST);
+  px(4, 11, ST); px(8, 11, ST);
+  // 꼬리 (옆으로 늘어진)
+  px(12, 11, OG); px(13, 11, OG); px(13, 12, OG); px(13, 13, DK);
 
-  // 잠든 머리
-  rect(4, 7, 9, 9, DK);
-  rect(5, 8, 8, 8, LT);
-  row(8, 5, 6, DK);
-  row(8, 8, 9, DK);
+  // 잠든 머리 (옆으로 누움)
+  rect(2, 7, 9, 10, DK);
+  rect(3, 8, 8, 9, OG);
+  rect(4, 8, 7, 8, LT);
+  // 귀 (납작하게)
+  px(2, 7, OG); px(3, 7, PK); px(4, 7, DK);
+  // 감긴 눈
+  row(8, 4, 5, DK);
+  // 코
+  px(6, 9, PK);
+
   ctx.restore();
 }
 
@@ -357,14 +399,68 @@ function drawEat(frame) {
 }
 
 function drawHappy(frame) {
-  const bounce = frame % 8 < 4 ? -1 : 0;
+  const t      = (frame % 12) / 12 * Math.PI * 2;
+  const sinVal = Math.sin(t);
+  // 위로 솟았다가 내려오는 포물선 아크
+  const jumpY  = -Math.max(0, sinVal) * 2.5 * PX;
+  // 공중에 있을 때 다리 교대 (달리는 느낌)
+  const legPhase  = sinVal > 0 ? 1 : 2;
+  const tailSwing = frame % 6 < 3 ? 1 : 0;
+
   ctx.save();
-  ctx.translate(0, bounce * PX);
+  ctx.translate(0, jumpY);
   drawBody();
-  drawLegs(frame % 8 < 4 ? 1 : 2);
-  drawTail(1);
+  drawLegs(legPhase);
+  drawTail(tailSwing);
   drawHead('happy');
   ctx.restore();
+}
+
+function drawCode(frame) {
+  const phase  = Math.floor(frame / 8) % 2;
+  const cursor = Math.floor(frame / 15) % 2;
+
+  const FR = '#252d3a'; // 노트북 프레임
+  const SC = '#0a1628'; // 화면 (어두운 파랑)
+  const CD = '#4aff70'; // 코드 줄 (초록)
+  const KB = '#6a7880'; // 키보드 (실버)
+
+  drawBody();
+  // 꼬리는 데스크 뒤에 숨겨짐 — 생략
+
+  // 맥북 화면 (열린 뚜껑)
+  rect(13, 3, 18, 10, FR);
+  rect(14, 4, 17, 9, SC);
+  row(4, 14, 16, CD);
+  row(5, 14, 15, CD);
+  row(6, 14, 17, CD);
+  row(7, 14, 15, CD);
+  if (cursor) px(16, 7, CD);
+  row(8, 14, 16, CD);
+
+  // 맥북 키보드 베이스
+  rect(11, 10, 18, 12, KB);
+  row(10, 11, 18, FR);
+  row(12, 11, 18, FR);
+  ctx.fillStyle = '#3a4856';
+  ctx.fillRect(12 * PX + 1, 11 * PX + 1, PX - 2, PX - 2);
+  ctx.fillRect(14 * PX + 1, 11 * PX + 1, PX - 2, PX - 2);
+  ctx.fillRect(16 * PX + 1, 11 * PX + 1, PX - 2, PX - 2);
+
+  // 뒷발 (접힌)
+  px(3, 13, OG); px(4, 13, OG);
+  px(3, 14, DK); px(4, 14, DK);
+
+  // 앞발 타이핑 (키보드 위에서 교대로 올라갔다 내려옴)
+  if (phase === 0) {
+    px(9, 11, OG); px(10, 11, OG); px(11, 11, OG);
+    px(8, 11, DK); px(12, 11, DK);
+  } else {
+    px(9, 10, OG); px(10, 10, OG); px(11, 10, OG);
+    px(8, 10, DK); px(12, 10, DK);
+  }
+
+  drawHead('open');
 }
 
 function drawCat(bx, by, state, frame, facingLeft) {
@@ -381,6 +477,7 @@ function drawCat(bx, by, state, frame, facingLeft) {
     case 'sleep':   drawSleeping(frame); break;
     case 'eat':     drawEat(frame);      break;
     case 'happy':   drawHappy(frame);    break;
+    case 'code':    drawCode(frame);     break;
     default:        drawSit(0);
   }
   ctx.restore();
@@ -389,6 +486,7 @@ function drawCat(bx, by, state, frame, facingLeft) {
 // ── 파티클 시스템 (하트, Zzz, 반짝) ─────────────────────────────
 const particles = [];
 
+const CODE_SYMS = ['{}', '()', '<>', '//', '=>'];
 function spawnParticle(type, sx, sy) {
   particles.push({
     type, x: sx, y: sy,
@@ -396,6 +494,7 @@ function spawnParticle(type, sx, sy) {
     vy: -1 - Math.random() * 1.5,
     life: 1.0,
     size: type === 'z' ? 14 : 10,
+    sym: type === 'codebit' ? CODE_SYMS[Math.floor(Math.random() * CODE_SYMS.length)] : null,
   });
 }
 
@@ -411,9 +510,10 @@ function tickParticles() {
     ctx.globalAlpha = p.life * 0.9;
     ctx.font = p.size + 'px monospace';
     ctx.textBaseline = 'top';
-    if      (p.type === 'z')      { ctx.fillStyle = ZC; ctx.fillText('z', p.x, p.y); }
-    else if (p.type === 'heart')  { ctx.fillStyle = HT; ctx.fillText('♥', p.x, p.y); }
-    else                          { ctx.fillStyle = '#ffd060'; ctx.fillText('✦', p.x, p.y); }
+    if      (p.type === 'z')       { ctx.fillStyle = ZC;       ctx.fillText('z',    p.x, p.y); }
+    else if (p.type === 'heart')   { ctx.fillStyle = HT;       ctx.fillText('♥',    p.x, p.y); }
+    else if (p.type === 'codebit') { ctx.fillStyle = '#4aff70'; ctx.fillText(p.sym,  p.x, p.y); }
+    else                           { ctx.fillStyle = '#ffd060'; ctx.fillText('✦',    p.x, p.y); }
     ctx.globalAlpha = 1;
   }
 }
@@ -467,8 +567,9 @@ function setMood(text, color = '#555') {
 
 function pickNextIdle() {
   const r = Math.random();
-  if (r < 0.4) return 'walk';
-  if (r < 0.7) return 'groom';
+  if (r < 0.35) return 'walk';
+  if (r < 0.55) return 'groom';
+  if (r < 0.75) return 'code';
   return 'sit';
 }
 
@@ -476,12 +577,13 @@ function startState(s) {
   catState = s;
   catFrame = 0;
   switch (s) {
-    case 'walk':  stateTimer = 120 + Math.random() * 180; setMood('walking', '#4a8a5a');     break;
-    case 'sit':   stateTimer = 100 + Math.random() * 160; setMood('sitting', '#888');         break;
-    case 'groom': stateTimer = 100 + Math.random() * 80;  setMood('grooming ✧', '#a080d0');  break;
-    case 'sleep': stateTimer = 9999;                       setMood('sleeping 💤', '#5070a0'); break;
-    case 'eat':   stateTimer = 140;                        setMood('eating 🐟', '#4a9eff');   break;
-    case 'happy': stateTimer = 100;                        setMood('happy ♥', '#ff6a88');     break;
+    case 'walk':  stateTimer = 120 + Math.random() * 180; setMood('walking', '#4a8a5a');      break;
+    case 'sit':   stateTimer = 100 + Math.random() * 160; setMood('sitting', '#888');          break;
+    case 'groom': stateTimer = 100 + Math.random() * 80;  setMood('grooming ✧', '#a080d0');   break;
+    case 'sleep': stateTimer = 9999;                       setMood('sleeping 💤', '#5070a0');  break;
+    case 'eat':   stateTimer = 140;                        setMood('eating 🐟', '#4a9eff');    break;
+    case 'happy': stateTimer = 100;                        setMood('happy ♥', '#ff6a88');      break;
+    case 'code':  stateTimer = 180; facingLeft = false;    setMood('coding 💻', '#4aff70');    break;
   }
 }
 
@@ -510,6 +612,9 @@ function tickState(floorY) {
   } else if (catState === 'happy') {
     if (catFrame % 10 === 0) spawnParticle('heart', catX + 7 * PX, catY);
     if (stateTimer <= 0) startState('sit');
+  } else if (catState === 'code') {
+    if (catFrame % 20 === 0) spawnParticle('codebit', catX + 10 * PX, catY - PX);
+    if (stateTimer <= 0) startState('sit');
   }
 
   ctx.save();
@@ -534,15 +639,17 @@ catX = W / 2 - 7 * PX;
 requestAnimationFrame(loop);
 
 // ── 커맨드 수신 (extension → webview) ───────────────────────────
-function feed()    { startState('eat'); }
-function pet()     { startState('happy'); }
-function goSleep() { startState(catState === 'sleep' ? 'sit' : 'sleep'); }
+function feed()      { startState('eat'); }
+function pet()       { startState('happy'); }
+function goSleep()   { startState(catState === 'sleep' ? 'sit' : 'sleep'); }
+function startCode() { startState('code'); }
 
 window.addEventListener('message', e => {
   const { type } = e.data;
   if (type === 'food')  feed();
   if (type === 'pet')   pet();
   if (type === 'sleep') goSleep();
+  if (type === 'code')  startCode();
 });
 
 // ── 캔버스 클릭 → meow ──────────────────────────────────────────
