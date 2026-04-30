@@ -1,0 +1,79 @@
+# Changelog
+
+All notable changes to **Pixel Cat** are documented here.  
+Format based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
+
+---
+
+## [0.2.0] — 2026-04-30 · Elemental Evolution System
+
+### Added
+- **알 선택 화면** — 최초 실행 시 불/물/풀 알 3개 표시, 호버 진동 애니메이션, 클릭 시 부화 연출 (파티클 폭발 + 줌인)
+- **속성 팔레트 시스템** — `PALETTES` 객체로 body/stripe/eye/particle 색상 분기 (fire/water/grass)
+- **속성별 커맨드 파티클** — 🔥 불꽃 / 💧 물방울 / 🍃 잎사귀 파티클
+- **XP 누적 시스템** — 파일 편집 감지 후 1분당 XP+1, `/food`·`/pet` 실행 시 XP+5 보너스
+- **레벨 계산** — `calcLevel(xp)` 함수, Lv.1~5 임계값 (500 / 1500 / 3500 / 7000)
+- **레벨업 연출** — 속성 파티클 폭발 + VSCode 알림 `🎉 Nabi가 Lv.N으로 성장했어요!`
+- **레벨별 스프라이트 진화**
+  - Lv.1: 아기 고양이, 눈 크고 머리 비율 큼
+  - Lv.2: 소폭 성장, 줄무늬 1~2개
+  - Lv.3: 성묘 비율, 귀 상단 털 픽셀
+  - Lv.4: 속성 악세서리 (불: 불꽃 왕관 / 물: 물방울 목걸이 / 풀: 잎사귀 머리띠)
+  - Lv.5: 오라 파티클 상시 발생 + 특별 색상 (금빛/은빛/황금잎)
+- **상태바 속성+레벨 표시** — `🔴 =^･ω･^= Lv.3` 형식, XP 변경 시 즉시 갱신
+
+### Fixed
+- **데이터 복원 타이밍 버그** — HTML 임베딩(`__INITIAL_DATA__`)으로 재시작 후 catType·xp·level 즉시 복원. 기존 `postMessage('init')` 방식의 race condition 해결
+
+---
+
+## [0.1.4] — 2026-04-24 · Sprite Overhaul + Coding Animation
+
+### Added
+- 고양이 스프라이트 전면 재설계 — 머리 2px 더 넓게, 뾰족한 삼각 귀, 2×2 초록 홍채 눈, 분홍 코
+- 꼬리 두께 2px, 발 끝 발톱 구분선, 수염 서브픽셀 렌더링 (좌우 방향 자동 반전)
+- `code` 상태 — 맥북 앞 타이핑 애니메이션, 화면에 코드 줄 깜빡임
+- 코드 파티클 (`{}` `()` `<>` `//` `=>`) 초록색
+- `💻 /code` 커맨드 + 버튼 추가
+- 자율 행동 확률 조정: walk 35% / sit 25% / groom 20% / code 20%
+- 하단 버튼 UI `flex: 1` 반응형
+
+---
+
+## [0.1.2] — 2026-04-16 · Sidebar Migration
+
+### Changed
+- `WebviewPanel`(에디터 탭) → Explorer 사이드바 `WebviewViewProvider`로 전환
+- 상태바 클릭 시 사이드바 패널 포커스
+
+---
+
+## [0.1.1] — 2026-04-16 · Prototype Integration
+
+### Added
+- 고양이 자율 행동: sit → walk → groom 자동 순환
+- 배경: 별 + 바닥 타일 픽셀아트
+- 파티클 시스템: ♥ (pet) / z (sleep) / ✦ (food)
+- 상태바 텍스트 애니메이션
+- 캔버스 내 버튼으로 직접 커맨드 실행
+- `/sleep` 토글, 캔버스 클릭 → meow + happy
+
+---
+
+## [0.1.0] — 2026-04-16 · MVP
+
+### Added
+- 16×16 픽셀아트 스프라이트 (팔레트 7색)
+- 6종 애니메이션: idle / walking / sitting / grooming / sleeping / eating
+- `/food` `/pet` `/sleep` 커맨드
+- 상태 영속성: `ExtensionContext.globalState`
+
+---
+
+## [0.0.1] — 2026-04-16 · Project Scaffolding
+
+### Added
+- `package.json` — VSCode 익스텐션 기본 구조
+- `extension.js` — activate/deactivate 뼈대, placeholder Canvas
+- `CLAUDE.md` — 프로젝트 개요·아키텍처·컨벤션
+- `docs/PLAN.md` — v0.1~v0.3 로드맵

@@ -20,6 +20,29 @@ function saveCatData(context, patch) {
   return next;
 }
 
+function calcLevel(xp) {
+  if (xp >= 7000) return 5;
+  if (xp >= 3500) return 4;
+  if (xp >= 1500) return 3;
+  if (xp >= 500)  return 2;
+  return 1;
+}
+
+function grantXP(context, provider, amount, onUpdate) {
+  const current = loadCatData(context);
+  if (!current.catType) return;
+  const newXp    = current.xp + amount;
+  const newLevel = calcLevel(newXp);
+  const leveled  = newLevel > current.level;
+  const next     = saveCatData(context, { xp: newXp, level: newLevel });
+  provider.sendData({ xp: next.xp, level: next.level });
+  onUpdate?.();
+  if (leveled) {
+    provider.sendLevelUp(newLevel);
+    vscode.window.showInformationMessage(`🎉 Nabi가 Lv.${newLevel}으로 성장했어요!`);
+  }
+}
+
 class CatViewProvider {
   constructor(context) {
     this._context = context;
@@ -29,14 +52,12 @@ class CatViewProvider {
   resolveWebviewView(webviewView) {
     this._view = webviewView;
     webviewView.webview.options = { enableScripts: true };
-    webviewView.webview.html = getHTML();
-
     const catData = loadCatData(this._context);
-    webviewView.webview.postMessage({ type: 'init', data: catData });
+    webviewView.webview.html = getHTML(catData);
 
     webviewView.webview.onDidReceiveMessage(msg => {
       if (msg.type === 'meow') vscode.window.showInformationMessage('🐱 Nyaa~!');
-      if (msg.type === 'saveCatData') saveCatData(this._context, msg.data);
+      if (msg.type === 'saveCatData') { saveCatData(this._context, msg.data); this._onDataSaved?.(); }
     });
     webviewView.onDidDispose(() => { this._view = null; });
   }
@@ -44,6 +65,14 @@ class CatViewProvider {
   send(type) {
     this._view?.webview.postMessage({ type });
     this._context.globalState.update('catState', type);
+  }
+
+  sendData(patch) {
+    this._view?.webview.postMessage({ type: 'xpUpdate', data: patch });
+  }
+
+  sendLevelUp(level) {
+    this._view?.webview.postMessage({ type: 'levelUp', level });
   }
 }
 
@@ -56,15 +85,40 @@ function activate(context) {
     })
   );
 
+  // ── 코딩 XP 감지: 파일 편집 이벤트 → 1분 단위 XP +1 ────────────────
+  let codingThisMinute = false;
+  context.subscriptions.push(
+    vscode.workspace.onDidChangeTextDocument(() => { codingThisMinute = true; })
+  );
+  const xpTimer = setInterval(() => {
+    if (!codingThisMinute) return;
+    codingThisMinute = false;
+    const cur = loadCatData(context);
+    saveCatData(context, { totalMinutes: cur.totalMinutes + 1 });
+    grantXP(context, provider, 1, updateStatusBar);
+  }, 60_000);
+  context.subscriptions.push({ dispose: () => clearInterval(xpTimer) });
+
   // ── 상태바 (왼쪽, 애니메이션) ──────────────────────────────────────
   const sb = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, -999);
   sb.command = 'pixelCat.show';
   sb.tooltip  = 'Click to visit your cat!';
-  sb.text     = '=^･ω･^=';
   sb.show();
   context.subscriptions.push(sb);
 
-  const sbFrames = ['=^･ω･^=', '=^♥♥^= ', '=^･ω･^=', '=^･ー･^='];
+  const catFaces = ['=^･ω･^=', '=^♥♥^= ', '=^･ω･^=', '=^･ー･^='];
+  const typeEmoji = { fire: '🔴', water: '🔵', grass: '🟢' };
+  let sbFrames = [...catFaces];
+
+  function updateStatusBar() {
+    const d = loadCatData(context);
+    const pre = d.catType ? typeEmoji[d.catType] + ' ' : '';
+    const suf = d.catType ? ' Lv.' + d.level : '';
+    sbFrames = catFaces.map(f => pre + f + suf);
+  }
+  updateStatusBar();
+  provider._onDataSaved = updateStatusBar;
+
   let sbi = 0;
   const sbTimer = setInterval(() => {
     sb.text = sbFrames[sbi++ % sbFrames.length];
@@ -81,8 +135,8 @@ function activate(context) {
 
   context.subscriptions.push(
     vscode.commands.registerCommand('pixelCat.show',  show),
-    vscode.commands.registerCommand('pixelCat.food',  () => send('food')),
-    vscode.commands.registerCommand('pixelCat.pet',   () => send('pet')),
+    vscode.commands.registerCommand('pixelCat.food',  () => { grantXP(context, provider, 5, updateStatusBar); send('food'); }),
+    vscode.commands.registerCommand('pixelCat.pet',   () => { grantXP(context, provider, 5, updateStatusBar); send('pet'); }),
     vscode.commands.registerCommand('pixelCat.sleep', () => send('sleep')),
     vscode.commands.registerCommand('pixelCat.code',  () => send('code')),
   );
@@ -91,7 +145,7 @@ function activate(context) {
 // ─────────────────────────────────────────────────────────────────
 //  WEBVIEW HTML
 // ─────────────────────────────────────────────────────────────────
-function getHTML() {
+function getHTML(catData) {
   return /* html */`<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -187,10 +241,11 @@ button:active { transform: scale(0.95); }
 </div>
 
 <script>
+const __INITIAL_DATA__ = ${JSON.stringify(catData)};
 const vscode = acquireVsCodeApi();
 
 // ── 영속 데이터 (extension globalState 미러) ─────────────────────
-let catData = { catType: null, xp: 0, level: 1, totalMinutes: 0 };
+let catData = __INITIAL_DATA__;
 
 function persistCatData(patch) {
   Object.assign(catData, patch);
@@ -198,7 +253,7 @@ function persistCatData(patch) {
 }
 
 // ── 알 선택 모드 ────────────────────────────────────────────────
-let eggMode   = false;
+let eggMode   = catData.catType === null;
 let eggFrame  = 0;
 let hatchAnim = null; // { type, x, y, frame } | null
 let catScale  = 1;
@@ -528,6 +583,39 @@ function drawCode(frame) {
   drawHead('open');
 }
 
+// ── 레벨별 외형 추가 레이어 ──────────────────────────────────────
+function drawLevelExtras(state) {
+  const level   = catData.level;
+  const catType = catData.catType;
+  if (!level || level < 2 || state === 'sleep') return;
+
+  // Lv.2+: 몸통 중앙 수평 줄무늬
+  row(11, 5, 8, ST);
+
+  // Lv.3+: 귀 끝 털 픽셀
+  if (level >= 3) {
+    px(3, 0, LT); px(10, 0, LT);
+  }
+
+  // Lv.4+: 속성 악세서리
+  if (level >= 4) {
+    if (catType === 'fire') {
+      // 불꽃 왕관
+      px(5, -3, '#ff8800'); px(7, -3, '#ffd700'); px(9, -3, '#ff8800');
+      px(4, -2, '#ffa000'); px(6, -2, '#ffcc00'); px(8, -2, '#ffcc00'); px(10, -2, '#ffa000');
+    } else if (catType === 'water') {
+      // 물방울 목걸이
+      row(8, 5, 8, '#00ccff');
+      px(6, 9, '#b8e0ff'); px(7, 9, '#00ccff'); px(8, 9, '#b8e0ff');
+    } else if (catType === 'grass') {
+      // 잎사귀 머리띠
+      px(4, -1, '#3a8030'); px(5, -1, '#5ab84a');
+      px(6, -1, '#90d080'); px(7, -1, '#5ab84a');
+      px(8, -1, '#5ab84a'); px(9, -1, '#3a8030');
+    }
+  }
+}
+
 function drawCat(bx, by, state, frame, facingLeft) {
   ctx.save();
   ctx.translate(bx, by);
@@ -545,6 +633,7 @@ function drawCat(bx, by, state, frame, facingLeft) {
     case 'code':    drawCode(frame);     break;
     default:        drawSit(0);
   }
+  drawLevelExtras(state);
   ctx.restore();
 }
 
@@ -811,8 +900,17 @@ function tickState(floorY) {
   ctx.save();
   ctx.translate(Math.round(catX), catY);
   applyPalette(catData.catType);
+  if (catData.level >= 5) {
+    const lv5 = { fire: '#ffd700', water: '#c0e8ff', grass: '#d4ff70' };
+    if (lv5[catData.catType]) OG = lv5[catData.catType];
+  }
   drawCat(0, 0, catState, catFrame, facingLeft);
   ctx.restore();
+
+  if (catData.level >= 5 && catFrame % 10 === 0) {
+    const sym = catData.catType && PALETTES[catData.catType]?.particle;
+    spawnParticle(sym ? 'attr' : 'sparkle', catX + 7 * PX, catY + 4 * PX, sym);
+  }
 }
 
 // ── 메인 루프 ────────────────────────────────────────────────────
@@ -842,11 +940,21 @@ function startCode() { startState('code'); }
 
 window.addEventListener('message', e => {
   const { type, data } = e.data;
-  if (type === 'init')  { catData = data; eggMode = catData.catType === null; updateEggPositions(); }
-  if (type === 'food')  feed();
-  if (type === 'pet')   pet();
-  if (type === 'sleep') goSleep();
-  if (type === 'code')  startCode();
+  if (type === 'init')     { catData = data; eggMode = catData.catType === null; updateEggPositions(); }
+  if (type === 'food')     feed();
+  if (type === 'pet')      pet();
+  if (type === 'sleep')    goSleep();
+  if (type === 'code')     startCode();
+  if (type === 'xpUpdate') Object.assign(catData, data);
+  if (type === 'levelUp') {
+    startState('happy');
+    const floorY = H - 24;
+    const catY   = floorY - 16 * PX + 4;
+    const sym    = catData.catType && PALETTES[catData.catType] && PALETTES[catData.catType].particle;
+    for (let i = 0; i < 30; i++) {
+      spawnParticle(sym ? 'attr' : 'gold', catX + 7 * PX, catY + 8 * PX, sym);
+    }
+  }
 });
 
 // ── 알 hover 감지 ────────────────────────────────────────────────
