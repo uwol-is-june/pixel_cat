@@ -1,6 +1,25 @@
 'use strict';
 const vscode = require('vscode');
 
+// ── globalState 데이터 구조 ───────────────────────────────────────
+const DEFAULT_CAT_DATA = {
+  catType: null,       // 'fire' | 'water' | 'grass' | null
+  xp: 0,
+  level: 1,
+  totalMinutes: 0,
+};
+
+function loadCatData(context) {
+  return Object.assign({}, DEFAULT_CAT_DATA, context.globalState.get('catData', {}));
+}
+
+function saveCatData(context, patch) {
+  const current = loadCatData(context);
+  const next = Object.assign({}, current, patch);
+  context.globalState.update('catData', next);
+  return next;
+}
+
 class CatViewProvider {
   constructor(context) {
     this._context = context;
@@ -11,8 +30,13 @@ class CatViewProvider {
     this._view = webviewView;
     webviewView.webview.options = { enableScripts: true };
     webviewView.webview.html = getHTML();
+
+    const catData = loadCatData(this._context);
+    webviewView.webview.postMessage({ type: 'init', data: catData });
+
     webviewView.webview.onDidReceiveMessage(msg => {
       if (msg.type === 'meow') vscode.window.showInformationMessage('🐱 Nyaa~!');
+      if (msg.type === 'saveCatData') saveCatData(this._context, msg.data);
     });
     webviewView.onDidDispose(() => { this._view = null; });
   }
@@ -165,6 +189,30 @@ button:active { transform: scale(0.95); }
 <script>
 const vscode = acquireVsCodeApi();
 
+// ── 영속 데이터 (extension globalState 미러) ─────────────────────
+let catData = { catType: null, xp: 0, level: 1, totalMinutes: 0 };
+
+function persistCatData(patch) {
+  Object.assign(catData, patch);
+  vscode.postMessage({ type: 'saveCatData', data: patch });
+}
+
+// ── 알 선택 모드 ────────────────────────────────────────────────
+let eggMode   = false;
+let eggFrame  = 0;
+let hatchAnim = null; // { type, x, y, frame } | null
+let catScale  = 1;
+
+const EGGS = [
+  { type: 'fire',  label: '🔴 불',  hover: false, x: 0, y: 0 },
+  { type: 'water', label: '🔵 물',  hover: false, x: 0, y: 0 },
+  { type: 'grass', label: '🟢 풀',  hover: false, x: 0, y: 0 },
+];
+function updateEggPositions() {
+  EGGS[0].x = W * 0.22; EGGS[1].x = W * 0.50; EGGS[2].x = W * 0.78;
+  EGGS[0].y = EGGS[1].y = EGGS[2].y = H * 0.42;
+}
+
 // ── 캔버스 세팅 ──────────────────────────────────────────────────
 const canvas = document.getElementById('c');
 const ctx    = canvas.getContext('2d');
@@ -175,6 +223,7 @@ function resize() {
   const s = document.getElementById('scene');
   W = canvas.width  = s.clientWidth;
   H = canvas.height = s.clientHeight;
+  if (eggMode) updateEggPositions();
 }
 resize();
 window.addEventListener('resize', () => { resize(); });
@@ -194,17 +243,33 @@ function rect(c1, r1, c2, r2, color) {
   for (let r = r1; r <= r2; r++) row(r, c1, c2, color);
 }
 
-// ── 색상 팔레트 ──────────────────────────────────────────────────
-const OG = '#e8942a'; // 주황 몸통
-const LT = '#f7c97a'; // 밝은 얼굴
-const PK = '#ffaaaa'; // 분홍 (귀 안, 코)
-const GR = '#d4a030'; // 호박 눈동자 (주황 태비 자연색)
-const DK = '#0d1117'; // 짙은 윤곽선
-const WH = '#f0e8d0'; // 크림 배
-const ST = '#b06820'; // 짙은 줄무늬
+// ── 속성별 팔레트 ────────────────────────────────────────────────
+const PALETTES = {
+  fire:  { body: '#e8521a', light: '#f89870', stripe: '#b03010', eye: '#ff4400', particle: '🔥' },
+  water: { body: '#4a90d9', light: '#a0c8f0', stripe: '#2860a8', eye: '#00ccff', particle: '💧' },
+  grass: { body: '#5ab84a', light: '#90d080', stripe: '#3a8030', eye: '#aaff44', particle: '🍃' },
+};
+
+// ── 색상 팔레트 (drawCat 호출 전 applyPalette()로 교체됨) ────────
+let OG = '#e8942a';   // 몸통 — 속성별 교체
+let LT = '#f7c97a';   // 밝은 얼굴 — 속성별 교체
+const PK = '#ffaaaa'; // 분홍 (귀 안, 코) — 고정
+let GR = '#d4a030';   // 눈동자 — 속성별 교체
+const DK = '#0d1117'; // 짙은 윤곽선 — 고정
+const WH = '#f0e8d0'; // 크림 배 — 고정
+let ST = '#b06820';   // 줄무늬 — 속성별 교체
 const FD = '#4a9eff'; // 생선 파란색
 const ZC = '#7090b0'; // Zzz 색
 const HT = '#ff6a88'; // 하트 색
+
+function applyPalette(catType) {
+  const pal = PALETTES[catType];
+  if (!pal) return;
+  OG = pal.body;
+  LT = pal.light;
+  GR = pal.eye;
+  ST = pal.stripe;
+}
 
 // ── 기본 몸통 ────────────────────────────────────────────────────
 function drawBody() {
@@ -484,17 +549,65 @@ function drawCat(bx, by, state, frame, facingLeft) {
 }
 
 // ── 파티클 시스템 (하트, Zzz, 반짝) ─────────────────────────────
+// ── 알 스프라이트 ────────────────────────────────────────────────
+// cx: 가로 중앙 좌표, cy: 상단 Y 좌표, shakeX: 흔들림 오프셋(px)
+function drawEgg(type, cx, cy, shakeX) {
+  const palettes = {
+    fire:  { base: '#e85020', shade: '#c03010', hi: '#ff9070', mark: '#801808' },
+    water: { base: '#4a90d9', shade: '#2868b0', hi: '#b8e0ff', mark: '#204888' },
+    grass: { base: '#5ab84a', shade: '#3a9030', hi: '#b0f090', mark: '#1a5010' },
+  };
+  const pal = palettes[type];
+  ctx.save();
+  ctx.translate(Math.round(cx - 3.5 * PX + shakeX), Math.round(cy));
+
+  // 하단 음영
+  row(4, 0, 6, pal.shade);
+  row(5, 1, 5, pal.shade);
+  row(6, 2, 4, pal.shade);
+  px(3, 7, pal.shade);
+
+  // 몸통
+  row(0, 2, 4, pal.base);
+  row(1, 1, 5, pal.base);
+  for (let r = 2; r <= 4; r++) row(r, 0, 6, pal.base);
+
+  // 상단 하이라이트
+  px(3, 0, pal.hi); px(4, 0, pal.hi);
+  px(2, 1, pal.hi); px(3, 1, pal.hi);
+
+  // 속성별 무늬
+  if (type === 'fire') {
+    // 크랙
+    px(3, 2, pal.mark); px(4, 3, pal.mark); px(3, 4, pal.mark);
+    px(2, 3, pal.mark); px(1, 4, pal.mark);
+  } else if (type === 'water') {
+    // 물결
+    row(2, 2, 4, pal.hi);
+    row(4, 1, 5, pal.hi);
+  } else {
+    // 점무늬
+    px(2, 2, pal.mark); px(4, 2, pal.mark);
+    px(2, 5, pal.mark); px(4, 5, pal.mark);
+  }
+
+  ctx.restore();
+}
+
 const particles = [];
 
 const CODE_SYMS = ['{}', '()', '<>', '//', '=>'];
-function spawnParticle(type, sx, sy) {
+function spawnParticle(type, sx, sy, sym = null) {
+  const isGold = type === 'gold';
+  const angle  = isGold ? Math.random() * Math.PI * 2 : 0;
+  const speed  = isGold ? 1.5 + Math.random() * 2.5 : 1;
   particles.push({
     type, x: sx, y: sy,
-    vx: (Math.random() - 0.5) * 1.2,
-    vy: -1 - Math.random() * 1.5,
+    vx: isGold ? Math.cos(angle) * speed : (Math.random() - 0.5) * 1.2,
+    vy: isGold ? Math.sin(angle) * speed : -1 - Math.random() * 1.5,
     life: 1.0,
-    size: type === 'z' ? 14 : 10,
-    sym: type === 'codebit' ? CODE_SYMS[Math.floor(Math.random() * CODE_SYMS.length)] : null,
+    size: type === 'z' ? 14 : type === 'gold' ? 13 : 10,
+    sym: type === 'codebit' ? CODE_SYMS[Math.floor(Math.random() * CODE_SYMS.length)] : (type === 'attr' ? sym : null),
   });
 }
 
@@ -513,9 +626,81 @@ function tickParticles() {
     if      (p.type === 'z')       { ctx.fillStyle = ZC;       ctx.fillText('z',    p.x, p.y); }
     else if (p.type === 'heart')   { ctx.fillStyle = HT;       ctx.fillText('♥',    p.x, p.y); }
     else if (p.type === 'codebit') { ctx.fillStyle = '#4aff70'; ctx.fillText(p.sym,  p.x, p.y); }
+    else if (p.type === 'gold')    { ctx.fillStyle = '#ffd700'; ctx.fillText('✦',    p.x, p.y); }
+    else if (p.type === 'attr')    {                            ctx.fillText(p.sym,  p.x, p.y); }
     else                           { ctx.fillStyle = '#ffd060'; ctx.fillText('✦',    p.x, p.y); }
     ctx.globalAlpha = 1;
   }
+}
+
+// ── 알 선택 화면 렌더링 ──────────────────────────────────────────
+function tickEggs(floorY) {
+  eggFrame++;
+
+  if (!hatchAnim) {
+    ctx.fillStyle = '#666';
+    ctx.font = '11px monospace';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'top';
+    ctx.fillText('알을 선택하세요', W / 2, 14);
+
+    for (const egg of EGGS) {
+      const shakeX = egg.hover ? Math.sin(eggFrame * 0.5) * 2 * PX : 0;
+      drawEgg(egg.type, egg.x, egg.y, shakeX);
+      ctx.fillStyle = '#aaa';
+      ctx.font = '11px monospace';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'top';
+      ctx.fillText(egg.label, egg.x, egg.y + 9 * PX);
+    }
+    return;
+  }
+
+  const f = ++hatchAnim.frame;
+
+  if (f < 30) {
+    // 점점 빨라지는 흔들림
+    const shakeX = Math.sin(f * 0.6) * (f * 0.15) * PX;
+    drawEgg(hatchAnim.type, hatchAnim.x, hatchAnim.y, shakeX);
+  } else if (f < 50) {
+    // 최대 흔들림 + 금 파티클 발생
+    const shakeX = Math.sin(f * 1.8) * 3 * PX;
+    drawEgg(hatchAnim.type, hatchAnim.x, hatchAnim.y, shakeX);
+    if (f % 3 === 0) {
+      for (let i = 0; i < 4; i++) spawnParticle('gold', hatchAnim.x, hatchAnim.y + 4 * PX);
+    }
+  } else if (f < 65) {
+    // 알 페이드아웃
+    if (f === 50) {
+      for (let i = 0; i < 20; i++) spawnParticle('gold', hatchAnim.x, hatchAnim.y + 4 * PX);
+    }
+    ctx.globalAlpha = 1 - (f - 50) / 15;
+    drawEgg(hatchAnim.type, hatchAnim.x, hatchAnim.y, 0);
+    ctx.globalAlpha = 1;
+  } else if (f < 95) {
+    // 고양이 줌인
+    catScale = (f - 65) / 30;
+    renderCatZoom(floorY);
+  } else {
+    catScale = 1;
+    eggMode = false;
+    hatchAnim = null;
+    persistCatData({ catType: catData.catType });
+    startState('sit');
+  }
+}
+
+function renderCatZoom(floorY) {
+  const spriteH = 16 * PX;
+  const cy = floorY - spriteH + 4;
+  catX = W / 2 - 7 * PX;
+  ctx.save();
+  ctx.translate(catX + 7 * PX, cy + 16 * PX);
+  ctx.scale(catScale, catScale);
+  ctx.translate(-7 * PX, -16 * PX);
+  applyPalette(catData.catType);
+  drawCat(0, 0, 'sit', 0, false);
+  ctx.restore();
 }
 
 // ── 배경 (픽셀아트 방) ──────────────────────────────────────────
@@ -607,10 +792,16 @@ function tickState(floorY) {
   } else if (catState === 'sleep') {
     if (catFrame % 60 === 0) spawnParticle('z', catX + 12 * PX, catY);
   } else if (catState === 'eat') {
-    if (catFrame % 15 === 0) spawnParticle('sparkle', catX + 14 * PX, catY + 4 * PX);
+    if (catFrame % 15 === 0) {
+      const sym = catData.catType && PALETTES[catData.catType] && PALETTES[catData.catType].particle;
+      spawnParticle(sym ? 'attr' : 'sparkle', catX + 14 * PX, catY + 4 * PX, sym);
+    }
     if (stateTimer <= 0) startState('sit');
   } else if (catState === 'happy') {
-    if (catFrame % 10 === 0) spawnParticle('heart', catX + 7 * PX, catY);
+    if (catFrame % 10 === 0) {
+      const sym = catData.catType && PALETTES[catData.catType] && PALETTES[catData.catType].particle;
+      spawnParticle(sym ? 'attr' : 'heart', catX + 7 * PX, catY, sym);
+    }
     if (stateTimer <= 0) startState('sit');
   } else if (catState === 'code') {
     if (catFrame % 20 === 0) spawnParticle('codebit', catX + 10 * PX, catY - PX);
@@ -619,6 +810,7 @@ function tickState(floorY) {
 
   ctx.save();
   ctx.translate(Math.round(catX), catY);
+  applyPalette(catData.catType);
   drawCat(0, 0, catState, catFrame, facingLeft);
   ctx.restore();
 }
@@ -630,7 +822,11 @@ function loop(ts) {
   if (ts - lastTime < 1000 / 30) return; // ~30fps
   lastTime = ts;
   const floorY = drawBG();
-  tickState(floorY);
+  if (eggMode) {
+    tickEggs(floorY);
+  } else {
+    tickState(floorY);
+  }
   tickParticles();
 }
 
@@ -645,21 +841,47 @@ function goSleep()   { startState(catState === 'sleep' ? 'sit' : 'sleep'); }
 function startCode() { startState('code'); }
 
 window.addEventListener('message', e => {
-  const { type } = e.data;
+  const { type, data } = e.data;
+  if (type === 'init')  { catData = data; eggMode = catData.catType === null; updateEggPositions(); }
   if (type === 'food')  feed();
   if (type === 'pet')   pet();
   if (type === 'sleep') goSleep();
   if (type === 'code')  startCode();
 });
 
-// ── 캔버스 클릭 → meow ──────────────────────────────────────────
+// ── 알 hover 감지 ────────────────────────────────────────────────
+canvas.addEventListener('mousemove', e => {
+  if (!eggMode || hatchAnim) return;
+  const r = canvas.getBoundingClientRect();
+  const mx = e.clientX - r.left, my = e.clientY - r.top;
+  for (const egg of EGGS) {
+    const hw = 4 * PX, hh = 5 * PX;
+    egg.hover = mx > egg.x - hw && mx < egg.x + hw && my > egg.y - hh && my < egg.y + hh + 4 * PX;
+  }
+});
+
+// ── 캔버스 클릭 ──────────────────────────────────────────────────
 canvas.addEventListener('click', e => {
-  const r      = canvas.getBoundingClientRect();
-  const mx     = e.clientX - r.left;
-  const my     = e.clientY - r.top;
-  const floorY = H - 24;
+  const r  = canvas.getBoundingClientRect();
+  const mx = e.clientX - r.left;
+  const my = e.clientY - r.top;
+
+  if (eggMode && !hatchAnim) {
+    for (const egg of EGGS) {
+      const hw = 4 * PX, hh = 5 * PX;
+      if (mx > egg.x - hw && mx < egg.x + hw && my > egg.y - hh && my < egg.y + hh + 4 * PX) {
+        catData.catType = egg.type;
+        hatchAnim = { type: egg.type, x: egg.x, y: egg.y, frame: 0 };
+        catX = W / 2 - 7 * PX;
+        return;
+      }
+    }
+    return;
+  }
+
+  const floorY  = H - 24;
   const spriteH = 16 * PX;
-  const catY   = floorY - spriteH + 4;
+  const catY    = floorY - spriteH + 4;
   if (mx > catX && mx < catX + 14 * PX && my > catY && my < catY + 16 * PX) {
     vscode.postMessage({ type: 'meow' });
     startState('happy');
